@@ -1,1 +1,647 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bouhzila.io - Play Now</title>
+    <!-- تضمين مكتبة Font Awesome للأيقونات -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        /* الخطوط */
+        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
+        
+        :root {
+            --primary-color: #E91E63; /* وردي زاهي */
+            --secondary-color: #00BCD4; /* أزرق سماوي */
+            --background-dark: #1a1a1a;
+            --text-light: #ffffff;
+            --font-family: 'Cairo', sans-serif;
+        }
 
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+            font-family: var(--font-family);
+            background-color: var(--background-dark);
+            color: var(--text-light);
+            text-align: center;
+        }
+
+        /* تخطيط الصفحة */
+        .page-container {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            position: relative;
+            z-index: 1; /* للتأكد من أن المحتوى فوق الكانفاس */
+        }
+
+        /* شريط التنقل (Navigation Bar) */
+        .navbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 40px;
+            background-color: rgba(0, 0, 0, 0.5);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .navbar-brand {
+            font-size: 2em;
+            font-weight: 900;
+            color: var(--primary-color);
+            text-decoration: none;
+        }
+
+        .navbar-links a {
+            color: var(--text-light);
+            text-decoration: none;
+            margin: 0 15px;
+            font-weight: 600;
+            font-size: 1.1em;
+            transition: color 0.3s ease;
+        }
+
+        .navbar-links a:hover {
+            color: var(--secondary-color);
+        }
+
+        .navbar-links i {
+            margin-left: 8px; /* لتحسين شكل الأيقونات في اللغة العربية */
+        }
+
+        /* المحتوى الرئيسي (Landing Section) */
+        .main-content {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-shadow: 0 0 10px rgba(0, 0, 0, 0.7);
+        }
+
+        .game-title {
+            font-size: 8em;
+            font-weight: bold;
+            letter-spacing: 5px;
+            margin: 0;
+            /* تأثير التدرج اللوني الوردي */
+            background-image: linear-gradient(45deg, var(--primary-color), #FF4081);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 20px rgba(233, 30, 99, 0.8);
+        }
+
+        .game-subtitle {
+            font-size: 1.5em;
+            margin-top: 10px;
+            margin-bottom: 30px;
+            color: #ccc;
+        }
+
+        /* زر اللعب */
+        .play-button {
+            padding: 15px 40px;
+            font-size: 1.8em;
+            font-weight: bold;
+            color: var(--text-light);
+            background-color: var(--primary-color);
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 8px 15px rgba(233, 30, 99, 0.4);
+            transition: transform 0.2s, background-color 0.2s, box-shadow 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 30px;
+        }
+
+        .play-button:hover {
+            background-color: #FF4081;
+            transform: translateY(-3px);
+            box-shadow: 0 12px 20px rgba(233, 30, 99, 0.6);
+        }
+
+        .play-button:active {
+            transform: translateY(0);
+            box-shadow: 0 5px 10px rgba(233, 30, 99, 0.4);
+        }
+
+        /* روابط المتاجر (تعديل طفيف لتمثيل أيقونات المتجر) */
+        .store-links {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 50px;
+        }
+
+        .store-link {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 20px;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            text-decoration: none;
+            color: var(--text-light);
+            transition: background-color 0.3s;
+        }
+
+        .store-link i {
+            font-size: 2em;
+        }
+
+        .store-link span {
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+
+        .store-link:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+        
+        /* تأثيرات الدوائر الخلفية (لتبدو مثل الخلفية في الصورة) */
+        .bubble {
+            position: absolute;
+            border-radius: 50%;
+            opacity: 0.6;
+            animation: float 20s infinite ease-in-out;
+            pointer-events: none; /* لا تتفاعل مع الفأرة */
+        }
+
+        /* الكانفاس للعبة (مخفي مبدئياً) */
+        #gameCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--background-dark);
+            z-index: 2; /* يظهر فوق صفحة الهبوط */
+            display: none; 
+        }
+
+        /* لوحة القيادة أثناء اللعب (مخفية مبدئياً) */
+        #gameHUD {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 10px;
+            color: var(--text-light);
+            z-index: 3;
+            display: none;
+            font-size: 1.1em;
+            text-align: right;
+        }
+
+        .hud-item {
+            margin-bottom: 5px;
+        }
+
+        /* رسالة الاتصال */
+        #connectionStatus {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 20px;
+            background-color: rgba(0, 0, 0, 0.8);
+            border-radius: 10px;
+            font-size: 1.5em;
+            color: yellow;
+            z-index: 100;
+            display: none;
+        }
+
+        /* التذييل (Footer) */
+        .footer {
+            padding: 20px;
+            background-color: rgba(0, 0, 0, 0.5);
+            font-size: 0.9em;
+            color: #aaa;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 40px;
+        }
+
+        .footer a {
+            color: #aaa;
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+
+        .footer a:hover {
+            color: var(--primary-color);
+        }
+
+        /* Keyframes for bubble animation */
+        @keyframes float {
+            0% { transform: translate(0, 0); }
+            50% { transform: translate(20px, 40px); }
+            100% { transform: translate(0, 0); }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- الكانفاس للخلفية -->
+    <canvas id="backgroundCanvas" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0;"></canvas>
+
+    <!-- حاوية الصفحة -->
+    <div class="page-container">
+        
+        <!-- شريط التنقل -->
+        <header class="navbar">
+            <a href="#" class="navbar-brand">B</a>
+            <nav class="navbar-links">
+                <a href="#"><i class="fas fa-home"></i>الرئيسية</a>
+                <a href="#" id="navPlayButton"><i class="fas fa-play"></i>لعب</a>
+                <a href="#"><i class="fas fa-users"></i>المنتدى</a>
+                <a href="#"><i class="fas fa-handshake"></i>الشركاء</a>
+                <a href="#"><i class="fas fa-envelope"></i>اتصل بنا</a>
+                <a href="#"><i class="fas fa-blog"></i>المدونة</a>
+            </nav>
+        </header>
+
+        <!-- المحتوى الرئيسي لصفحة الهبوط -->
+        <main class="main-content" id="landingSection">
+            <h1 class="game-title">BOUHZILA.IO</h1>
+            <p class="game-subtitle">E.at other players to gain XP and Level up!</p>
+            
+            <button class="play-button" id="mainPlayButton">العب الآن</button>
+
+            <div class="store-links">
+                <!-- أيقونات المتاجر (لتمثيل الواجهة في الصورة) -->
+                <a href="#" class="store-link">
+                    <i class="fab fa-steam"></i>
+                    <div>
+                        <small>احصل عليها على</small>
+                        <span>Steam</span>
+                    </div>
+                </a>
+                <a href="#" class="store-link">
+                    <i class="fab fa-apple"></i>
+                    <div>
+                        <small>احصل عليها على</small>
+                        <span>App Store</span>
+                    </div>
+                </a>
+                <a href="#" class="store-link">
+                    <i class="fab fa-google-play"></i>
+                    <div>
+                        <small>احصل عليها على</small>
+                        <span>Google Play</span>
+                    </div>
+                </a>
+            </div>
+        </main>
+
+        <!-- منطقة اللعب (Canvas) -->
+        <canvas id="gameCanvas"></canvas>
+
+        <!-- لوحة القيادة أثناء اللعب -->
+        <div id="gameHUD">
+            <div class="hud-item">الدرجة: <span id="hudScore">0</span></div>
+            <div class="hud-item">الاسم: <span id="hudName">Guest</span></div>
+            <div class="hud-item">FPS: <span id="hudFPS">0</span></div>
+        </div>
+
+        <!-- رسالة حالة الاتصال -->
+        <div id="connectionStatus">جاري الاتصال بالخادم...</div>
+
+        <!-- التذييل -->
+        <footer class="footer">
+            <p>© Bouhzila.io, All rights reserved.</p>
+            <a href="#">Privacy Policy</a>
+            <p>Website Design by Zimek</p>
+        </footer>
+
+    </div>
+
+    <script>
+        // ----------------------------------------------------
+        // الإعدادات العامة
+        // ----------------------------------------------------
+        
+        // الرابط الفعلي لخادمك على Render (بروتوكول WSS الآمن)
+        const SERVER_URL = 'wss://bouhzila-io-1.onrender.com';
+        
+        let ws;
+        let gameCanvas = document.getElementById('gameCanvas');
+        let ctx = gameCanvas.getContext('2d');
+        let landingSection = document.getElementById('landingSection');
+        let gameHUD = document.getElementById('gameHUD');
+        let connectionStatus = document.getElementById('connectionStatus');
+        
+        let playerID = null;
+        let localPlayer = null;
+        let allPlayers = {};
+        let gameFood = [];
+        let worldSize = 5000;
+        let viewport = { x: 0, y: 0, w: 0, h: 0 }; // إطار عرض الكاميرا
+
+        // FPS Tracker
+        let lastTime = 0;
+        let fps = 0;
+        
+        // Input tracking
+        let mousePosition = { x: 0, y: 0 };
+        let inputInterval = null;
+
+        // ----------------------------------------------------
+        // وظائف الواجهة (UI Functions)
+        // ----------------------------------------------------
+
+        function adjustCanvasSize() {
+            gameCanvas.width = window.innerWidth;
+            gameCanvas.height = window.innerHeight;
+            viewport.w = window.innerWidth;
+            viewport.h = window.innerHeight;
+            
+            // إعادة رسم الخلفية عند تغيير الحجم
+            drawBackgroundBubbles();
+        }
+
+        // إنشاء وتحديث دوائر الخلفية المتحركة
+        function createBackgroundBubbles() {
+            const numBubbles = 15;
+            for (let i = 0; i < numBubbles; i++) {
+                const bubble = document.createElement('div');
+                bubble.classList.add('bubble');
+                bubble.style.width = bubble.style.height = `${Math.random() * 200 + 100}px`;
+                bubble.style.top = `${Math.random() * 100}%`;
+                bubble.style.left = `${Math.random() * 100}%`;
+                
+                // ألوان عشوائية للدوائر (لتشبه الصورة)
+                const colors = ['#E91E63', '#9C27B0', '#009688', '#FF9800', '#F44336', '#3F51B5'];
+                bubble.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                
+                // تأخير عشوائي للحركة
+                bubble.style.animationDelay = `${Math.random() * -20}s`;
+                document.body.appendChild(bubble);
+            }
+        }
+        
+        // إظهار وإخفاء شاشة اللعب
+        function startGameDisplay() {
+            // إخفاء صفحة الهبوط والتذييل
+            landingSection.style.display = 'none';
+            document.querySelector('.footer').style.display = 'none';
+            document.querySelector('.navbar-links').style.display = 'none'; // إخفاء الروابط العلوية
+            document.querySelector('.navbar-brand').style.display = 'none'; // إخفاء شعار "B"
+
+            // إظهار اللعبة ولوحة القيادة
+            gameCanvas.style.display = 'block';
+            gameHUD.style.display = 'block';
+            document.getElementById('backgroundCanvas').style.display = 'none'; // إخفاء خلفية الهبوط
+            
+            // بدء حلقة اللعبة
+            requestAnimationFrame(gameLoop);
+
+            // بدء تتبع الإدخال
+            startInputTracking();
+        }
+
+        // ----------------------------------------------------
+        // وظائف الاتصال (WebSocket)
+        // ----------------------------------------------------
+
+        function connectToServer() {
+            connectionStatus.innerHTML = 'جاري الاتصال بالخادم...';
+            connectionStatus.style.display = 'block';
+            
+            ws = new WebSocket(SERVER_URL);
+
+            ws.onopen = () => {
+                console.log('Connected to server.');
+                connectionStatus.innerHTML = 'تم الاتصال. انقر للبدء!';
+                setTimeout(() => {
+                    connectionStatus.style.display = 'none';
+                    // تشغيل شاشة اللعب بعد الاتصال الناجح
+                    startGameDisplay(); 
+                }, 1000);
+            };
+
+            ws.onmessage = (message) => {
+                const data = JSON.parse(message.data);
+                
+                if (data.type === 'INIT') {
+                    playerID = data.id;
+                    worldSize = data.worldSize;
+                    gameFood = data.initialFood || [];
+                } else if (data.type === 'UPDATE') {
+                    allPlayers = {};
+                    data.players.forEach(p => {
+                        allPlayers[p.id] = p;
+                        if (p.id === playerID) {
+                            localPlayer = p;
+                            // تحديث لوحة القيادة
+                            document.getElementById('hudScore').innerText = p.score;
+                            document.getElementById('hudName').innerText = p.name;
+                        }
+                    });
+                    gameFood = data.food || [];
+                }
+            };
+
+            ws.onclose = () => {
+                console.log('Disconnected from server.');
+                connectionStatus.innerHTML = 'انقطع الاتصال بالخادم. إعادة المحاولة...';
+                connectionStatus.style.display = 'block';
+                // إعادة محاولة الاتصال بعد 3 ثواني
+                setTimeout(connectToServer, 3000);
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                connectionStatus.innerHTML = 'خطأ في الاتصال. تحقق من الرابط.';
+            };
+        }
+
+        // إرسال حركات اللاعب إلى الخادم
+        function sendMovement() {
+            if (ws && ws.readyState === WebSocket.OPEN && localPlayer) {
+                // حساب متجه الحركة بناءً على موقع الفأرة بالنسبة لمركز الشاشة
+                const centerX = gameCanvas.width / 2;
+                const centerY = gameCanvas.height / 2;
+
+                // تحويل إحداثيات الفأرة إلى متجه (Vector)
+                const dirX = mousePosition.x - centerX;
+                const dirY = mousePosition.y - centerY;
+
+                // تطبيع المتجه (جعل طوله 1)
+                const magnitude = Math.sqrt(dirX * dirX + dirY * dirY);
+                let normalizedX = 0;
+                let normalizedY = 0;
+
+                if (magnitude > 10) { // تحريك فقط إذا كانت الفأرة بعيدة عن المركز
+                    normalizedX = dirX / magnitude;
+                    normalizedY = dirY / magnitude;
+                }
+                
+                ws.send(JSON.stringify({
+                    type: 'MOVE',
+                    direction: { x: normalizedX, y: normalizedY }
+                }));
+            }
+        }
+
+        // ----------------------------------------------------
+        // وظائف اللعبة (Game Loop & Drawing)
+        // ----------------------------------------------------
+        
+        function gameLoop(timestamp) {
+            // حساب FPS
+            const deltaTime = timestamp - lastTime;
+            lastTime = timestamp;
+            fps = Math.round(1000 / deltaTime);
+            document.getElementById('hudFPS').innerText = fps;
+
+            // 1. مسح الكانفاس
+            ctx.clearRect(0, 0, gameCanvas.width, gameCanvas.height);
+
+            if (localPlayer) {
+                // 2. تحديث الكاميرا (المنظر)
+                // الكاميرا تتبع اللاعب المحلي
+                viewport.x = localPlayer.x - gameCanvas.width / 2;
+                viewport.y = localPlayer.y - gameCanvas.height / 2;
+
+                // 3. رسم الطعام
+                ctx.fillStyle = 'red';
+                gameFood.forEach(food => {
+                    ctx.beginPath();
+                    const screenX = food.x - viewport.x;
+                    const screenY = food.y - viewport.y;
+                    
+                    // رسم فقط إذا كان الطعام داخل إطار العرض
+                    if (screenX > 0 && screenX < viewport.w && screenY > 0 && screenY < viewport.h) {
+                        ctx.fillStyle = food.color || '#39FF14'; // لون الطعام
+                        ctx.arc(screenX, screenY, 5, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                });
+
+                // 4. رسم اللاعبين
+                for (const id in allPlayers) {
+                    const player = allPlayers[id];
+                    const screenX = player.x - viewport.x;
+                    const screenY = player.y - viewport.y;
+                    
+                    // رسم حدود الدائرة
+                    ctx.beginPath();
+                    ctx.arc(screenX, screenY, player.r, 0, Math.PI * 2);
+                    ctx.strokeStyle = '#FFFFFF';
+                    ctx.lineWidth = 3;
+                    ctx.stroke();
+
+                    // رسم تعبئة الدائرة
+                    ctx.fillStyle = id === playerID ? 'rgba(233, 30, 99, 0.5)' : 'rgba(0, 188, 212, 0.5)';
+                    ctx.fill();
+
+                    // كتابة الاسم والدرجة
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.textAlign = 'center';
+                    ctx.font = 'bold 16px Arial';
+                    ctx.fillText(player.name, screenX, screenY - 5);
+                    ctx.font = '12px Arial';
+                    ctx.fillText('كتلة: ' + Math.floor(player.mass), screenX, screenY + 15);
+                }
+            }
+
+            // الاستمرار في حلقة اللعبة
+            requestAnimationFrame(gameLoop);
+        }
+
+        // ----------------------------------------------------
+        // معالجة الإدخال (Input Handling)
+        // ----------------------------------------------------
+
+        function startInputTracking() {
+            // تحديث موقع الفأرة
+            gameCanvas.addEventListener('mousemove', (e) => {
+                mousePosition.x = e.clientX;
+                mousePosition.y = e.clientY;
+            });
+            
+            // إرسال الحركة بشكل دوري
+            if (!inputInterval) {
+                inputInterval = setInterval(sendMovement, 1000 / 60); // 60 مرة في الثانية
+            }
+        }
+        
+        // ----------------------------------------------------
+        // وظائف الخلفية (Canvas Background)
+        // ----------------------------------------------------
+
+        const bgCanvas = document.getElementById('backgroundCanvas');
+        const bgCtx = bgCanvas.getContext('2d');
+        const bgBubbles = [];
+        
+        function initBackgroundBubbles() {
+            bgCanvas.width = window.innerWidth;
+            bgCanvas.height = window.innerHeight;
+            for(let i = 0; i < 20; i++) {
+                bgBubbles.push({
+                    x: Math.random() * bgCanvas.width,
+                    y: Math.random() * bgCanvas.height,
+                    radius: Math.random() * 80 + 20,
+                    color: `rgba(${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}, 0.2)`,
+                    speedX: (Math.random() - 0.5) * 0.2,
+                    speedY: (Math.random() - 0.5) * 0.2,
+                });
+            }
+        }
+
+        function drawBackgroundBubbles() {
+            bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
+            bgBubbles.forEach(bubble => {
+                bgCtx.beginPath();
+                bgCtx.arc(bubble.x, bubble.y, bubble.radius, 0, Math.PI * 2);
+                bgCtx.fillStyle = bubble.color;
+                bgCtx.fill();
+            });
+        }
+        
+        function updateBackgroundBubbles() {
+            bgBubbles.forEach(bubble => {
+                bubble.x += bubble.speedX;
+                bubble.y += bubble.speedY;
+
+                // ارتداد من الحواف
+                if (bubble.x + bubble.radius > bgCanvas.width || bubble.x - bubble.radius < 0) {
+                    bubble.speedX *= -1;
+                }
+                if (bubble.y + bubble.radius > bgCanvas.height || bubble.y - bubble.radius < 0) {
+                    bubble.speedY *= -1;
+                }
+            });
+            drawBackgroundBubbles();
+            requestAnimationFrame(updateBackgroundBubbles);
+        }
+        
+        // ----------------------------------------------------
+        // تشغيل (Initialization)
+        // ----------------------------------------------------
+
+        // تهيئة الواجهة عند تحميل الصفحة
+        window.onload = function() {
+            createBackgroundBubbles(); // إنشاء دوائر CSS
+            initBackgroundBubbles(); // إنشاء دوائر الكانفاس
+            updateBackgroundBubbles(); // بدء حركة الخلفية
+            adjustCanvasSize(); // ضبط حجم الكانفاس
+            window.addEventListener('resize', adjustCanvasSize);
+
+            // عند الضغط على زر "العب الآن"
+            document.getElementById('mainPlayButton').addEventListener('click', connectToServer);
+            document.getElementById('navPlayButton').addEventListener('click', (e) => {
+                e.preventDefault();
+                connectToServer();
+            });
+        }
+    </script>
+</body>
+</html>

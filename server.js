@@ -1,365 +1,388 @@
-// --- إعدادات الخادم والتبعيات ---
+// إعدادات الخادم والتبعيات
 const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
 const path = require('path');
 
+// اسم النطاق الخاص بك على Render (مهم جداً للاتصال الآمن)
+const USER_SERVER_DOMAIN = 'bouhzila-io-1.onrender.com';
+const PORT = process.env.PORT || 8080;
+
+// إعداد خادم Express
 const app = express();
 const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
 
-// رابط الخادم الخاص بك على Render لضمان اتصال WSS الآمن
-const USER_SERVER_DOMAIN = 'bouhzila-io-1.onrender.com';
-const PORT = process.env.PORT || 10000;
-
-// مسار الملفات الثابتة (واجهة اللعبة)
+// خدمة الملفات الثابتة من مجلد 'public'
 app.use(express.static(path.join(__dirname, 'public')));
 
-// --- إعدادات اللعبة العامة ---
-const MAP_WIDTH = 2000;
-const MAP_HEIGHT = 2000;
-const MAX_FOOD = 500;
-const MAX_BOTS = 15;
-const GAME_SPEED = 1000 / 60; // 60 إطار في الثانية
+// إعداد خادم WebSocket (مرتبط بخادم HTTP)
+const wss = new WebSocket.Server({ server });
 
-// --- هياكل بيانات اللعبة ---
+// ------------------------------------------------------------------
+// منطق اللعبة
+// ------------------------------------------------------------------
+
+// إعدادات اللعبة الأساسية
+const MAP_WIDTH = 4000;
+const MAP_HEIGHT = 4000;
+const PLAYER_START_SIZE = 10;
+const BOT_COUNT = 15;
+const FOOD_COUNT = 300;
+const GAME_TICK = 1000 / 60; // 60 إطار في الثانية
+
+// هياكل بيانات لحالة اللعبة
 let players = {};
 let food = [];
-let nextFoodId = 0;
+let bots = [];
 let nextPlayerId = 1;
 
-// --- دالة إضافة الطعام (Food) ---
-function addFood() {
-    if (food.length < MAX_FOOD) {
-        food.push({
-            id: nextFoodId++,
-            x: Math.random() * MAP_WIDTH - MAP_WIDTH / 2,
-            y: Math.random() * MAP_HEIGHT - MAP_HEIGHT / 2,
-            size: 10,
-            color: getRandomColor()
-        });
-    }
+// ----------------------
+// دوال المساعدة
+// ----------------------
+
+function createRandomFood() {
+    return {
+        x: Math.random() * MAP_WIDTH,
+        y: Math.random() * MAP_HEIGHT,
+        size: 1,
+        color: getRandomColor()
+    };
 }
 
-// --- دالة توليد لون عشوائي ---
 function getRandomColor() {
-    const colors = ['#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#00FFFF', '#FF00FF', '#FFA500', '#800080'];
+    const colors = ['#e74c3c', '#3498db', '#2ecc71', '#f1c40f', '#9b59b6', '#1abc9c', '#e67e22'];
     return colors[Math.floor(Math.random() * colors.length)];
 }
 
-// --- دالة إنشاء لاعب/خلية (Player/Cell) ---
-function createCell(id, x, y, size, name, isBot = false) {
-    return {
-        id,
-        x,
-        y,
-        size,
-        color: getRandomColor(),
-        name: name,
-        isBot: isBot,
-        targetX: x,
-        targetY: y,
-        lastSplitTime: Date.now()
+function createPlayer(isBot = false, id = null) {
+    const playerId = id || (isBot ? `bot_${nextPlayerId++}` : nextPlayerId++);
+    const newPlayer = {
+        id: playerId,
+        name: isBot ? `Bot ${playerId.split('_')[1]}` : `Player ${playerId}`,
+        cells: [{
+            x: Math.random() * MAP_WIDTH,
+            y: Math.random() * MAP_HEIGHT,
+            size: PLAYER_START_SIZE,
+            velX: 0,
+            velY: 0,
+            color: getRandomColor(),
+            mass: PLAYER_START_SIZE * PLAYER_START_SIZE,
+            isBot: isBot
+        }],
+        targetX: 0,
+        targetY: 0,
+        score: PLAYER_START_SIZE,
+        lastHeartbeat: Date.now()
     };
-}
-
-// --- دالة إضافة لاعب جديد (للإنسان والروبوت) ---
-function addPlayer(name, isBot = false) {
-    const id = nextPlayerId++;
-    const x = Math.random() * MAP_WIDTH - MAP_WIDTH / 2;
-    const y = Math.random() * MAP_HEIGHT - MAP_HEIGHT / 2;
-    const size = isBot ? 20 : 30; // الروبوتات تبدأ أصغر قليلاً
-
-    players[id] = {
-        id: id,
-        name: name,
-        isBot: isBot,
-        cells: [createCell(id, x, y, size, name, isBot)],
-        targetX: x,
-        targetY: y,
-        score: size * size // النتيجة هي الحجم المربع
-    };
-    return players[id];
-}
-
-// --- منطق الذكاء الاصطناعي للبوتات (Bot AI Logic) ---
-function updateBot(bot) {
-    let bestTarget = null;
-    let minDistance = Infinity;
-    const botCell = bot.cells[0]; // البوتات تبدأ بخلية واحدة فقط للتبسيط
-
-    // 1. الأولوية لأكل الطعام
-    for (const f of food) {
-        const dist = Math.sqrt(Math.pow(f.x - botCell.x, 2) + Math.pow(f.y - botCell.y, 2));
-        if (dist < minDistance && dist < 500) {
-            minDistance = dist;
-            bestTarget = f;
-        }
+    players[playerId] = newPlayer;
+    if (isBot) {
+        bots.push(newPlayer.id);
     }
+    return newPlayer;
+}
 
-    // 2. إذا لم يكن هناك طعام قريب، ابحث عن لاعب أصغر (أو خلية أصغر)
-    if (!bestTarget) {
-        for (const pid in players) {
-            const potentialVictim = players[pid];
-            if (potentialVictim.id !== bot.id && potentialVictim.cells.length > 0) {
-                const victimCell = potentialVictim.cells[0];
-                // يمكن الأكل إذا كان حجم خلية البوت أكبر بنسبة 10%
-                if (botCell.size * 1.1 < victimCell.size) continue;
+// تهيئة الطعام
+function initializeFood() {
+    for (let i = 0; i < FOOD_COUNT; i++) {
+        food.push(createRandomFood());
+    }
+}
 
-                const dist = Math.sqrt(Math.pow(victimCell.x - botCell.x, 2) + Math.pow(victimCell.y - botCell.y, 2));
-                if (dist < minDistance && dist < 800) {
-                    minDistance = dist;
-                    bestTarget = victimCell;
+// ----------------------
+// منطق الحركة
+// ----------------------
+
+function updateMovement(deltaTime) {
+    Object.values(players).forEach(player => {
+        if (!player.cells || player.cells.length === 0) return; // تأكد من وجود خلايا
+
+        player.cells.forEach(cell => {
+            // حساب السرعة بناءً على الكتلة (الخلايا الأكبر أبطأ)
+            const speed = 100 / Math.log10(cell.mass + 10);
+
+            // حركة اللاعبين البشريين (باستخدام targetX/Y)
+            if (!player.cells[0].isBot) {
+                const angle = Math.atan2(player.targetY - cell.y, player.targetX - cell.x);
+                cell.velX = Math.cos(angle) * speed;
+                cell.velY = Math.sin(angle) * speed;
+
+                // التوقف إذا كانت المسافة قصيرة لتجنب الارتعاش
+                const distance = Math.sqrt((player.targetX - cell.x)**2 + (player.targetY - cell.y)**2);
+                if (distance < cell.size / 2) {
+                    cell.velX = 0;
+                    cell.velY = 0;
                 }
             }
-        }
-    }
+            // حركة البوتات (يتم تحديد targetX/Y بواسطة AI)
+            // إذا كان بوتًا، فسيتم تعيين targetX/Y بواسطة وظيفة updateBotAI
 
-    // 3. تحديد نقطة التحرك
-    if (bestTarget) {
-        bot.targetX = bestTarget.x;
-        bot.targetY = bestTarget.y;
-    } else {
-        // تحرك عشوائي إذا لم يكن هناك هدف
-        if (Math.random() < 0.05) {
-            bot.targetX = botCell.x + (Math.random() - 0.5) * 500;
-            bot.targetY = botCell.y + (Math.random() - 0.5) * 500;
-        }
-    }
+            // تطبيق الحركة والحدود
+            cell.x += cell.velX * deltaTime;
+            cell.y += cell.velY * deltaTime;
 
-    // الهروب من الخطر (منطق بسيط)
-    // يمكن إضافة منطق هروب متقدم هنا لاحقاً
-
-    // تطبيق الحركة
-    const speed = Math.max(2, 5 / Math.sqrt(botCell.size / 30));
-    const dx = bot.targetX - botCell.x;
-    const dy = bot.targetY - botCell.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-
-    if (dist > 1) {
-        botCell.x += (dx / dist) * speed;
-        botCell.y += (dy / dist) * speed;
-    }
-
-    // تطبيق حدود الخريطة
-    botCell.x = Math.max(Math.min(botCell.x, MAP_WIDTH / 2), -MAP_WIDTH / 2);
-    botCell.y = Math.max(Math.min(botCell.y, MAP_HEIGHT / 2), -MAP_HEIGHT / 2);
+            // تطبيق حدود الخريطة
+            cell.x = Math.max(cell.size, Math.min(MAP_WIDTH - cell.size, cell.x));
+            cell.y = Math.max(cell.size, Math.min(MAP_HEIGHT - cell.size, cell.y));
+        });
+    });
 }
 
-// --- دالة الحركة الأساسية (لكل الخلايا) ---
-function moveCell(cell, targetX, targetY) {
-    const speed = Math.max(2, 5 / Math.sqrt(cell.size / 30));
-    const dx = targetX - cell.x;
-    const dy = targetY - cell.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
+// ----------------------
+// منطق الروبوتات (AI)
+// ----------------------
 
-    if (dist > 1) {
-        cell.x += (dx / dist) * speed;
-        cell.y += (dy / dist) * speed;
-    }
+function updateBotAI() {
+    bots.forEach(botId => {
+        const bot = players[botId];
+        if (!bot || bot.cells.length === 0) return;
 
-    // تطبيق حدود الخريطة
-    cell.x = Math.max(Math.min(cell.x, MAP_WIDTH / 2), -MAP_WIDTH / 2);
-    cell.y = Math.max(Math.min(cell.y, MAP_HEIGHT / 2), -MAP_HEIGHT / 2);
-}
+        const mainCell = bot.cells[0];
 
-// --- دالة الكشف عن الاصطدام والأكل ---
-function checkCollisions() {
-    // 1. اصطدام الخلايا مع الطعام
-    for (const playerId in players) {
-        const player = players[playerId];
-        player.cells.forEach(cell => {
-            for (let i = food.length - 1; i >= 0; i--) {
-                const f = food[i];
-                const distance = Math.sqrt(Math.pow(cell.x - f.x, 2) + Math.pow(cell.y - f.y, 2));
+        // 1. البحث عن أقرب طعام
+        let closestTarget = null;
+        let minDistance = Infinity;
 
-                if (distance < cell.size) { // إذا حدث اصطدام
-                    cell.size += 1; // زيادة الحجم
-                    player.score += 1;
-                    food.splice(i, 1); // إزالة الطعام
-                    addFood(); // إضافة طعام جديد فوراً
-                }
+        // دمج الطعام واللاعبين الأصغر كأهداف
+        const targets = [...food, ...Object.values(players).flatMap(p => 
+            p.cells.filter(c => c.size < mainCell.size * 0.95 && c.id !== mainCell.id)
+        )];
+
+        targets.forEach(target => {
+            const distance = Math.sqrt((mainCell.x - target.x)**2 + (mainCell.y - target.y)**2);
+            if (distance < minDistance) {
+                minDistance = distance;
+                closestTarget = target;
             }
         });
+
+        if (closestTarget) {
+            bot.targetX = closestTarget.x;
+            bot.targetY = closestTarget.y;
+        } else {
+            // حركة عشوائية إذا لم يجد هدفًا
+            bot.targetX = mainCell.x + (Math.random() - 0.5) * 500;
+            bot.targetY = mainCell.y + (Math.random() - 0.5) * 500;
+        }
+
+        // تطبيق الهدف على جميع خلايا البوت (مبسط)
+        bot.cells.forEach(cell => {
+            cell.targetX = bot.targetX;
+            cell.targetY = bot.targetY;
+        });
+    });
+}
+
+// ----------------------
+// منطق الاصطدام (الأكل)
+// ----------------------
+
+function checkCollisions() {
+    // 1. اصطدام اللاعب بالطعام
+    food = food.filter(f => {
+        let eaten = false;
+        Object.values(players).forEach(player => {
+            player.cells.forEach(cell => {
+                const distance = Math.sqrt((cell.x - f.x)**2 + (cell.y - f.y)**2);
+                if (distance < cell.size) { // إذا تداخلت الخلية مع الطعام
+                    cell.mass += f.size * 0.5; // يزداد الوزن
+                    cell.size = Math.sqrt(cell.mass / Math.PI); // يتم تحديث الحجم
+                    player.score = cell.mass;
+                    eaten = true;
+                }
+            });
+        });
+        return !eaten; // إزالة الطعام المأكول
+    });
+
+    // إعادة توليد الطعام
+    while (food.length < FOOD_COUNT) {
+        food.push(createRandomFood());
     }
 
-    // 2. اصطدام الخلايا مع بعضها البعض (الأكل)
+    // 2. اصطدام اللاعب باللاعب
     const playerIds = Object.keys(players);
     for (let i = 0; i < playerIds.length; i++) {
         const playerA = players[playerIds[i]];
-        for (let j = i; j < playerIds.length; j++) {
-            if (i === j) continue; // لا تتفحص الاصطدام مع نفس اللاعب
 
+        for (let j = i + 1; j < playerIds.length; j++) {
             const playerB = players[playerIds[j]];
 
-            playerA.cells.forEach(cellA => {
-                playerB.cells.forEach(cellB => {
-                    const distance = Math.sqrt(Math.pow(cellA.x - cellB.x, 2) + Math.pow(cellA.y - cellB.y, 2));
+            if (!playerA || !playerB) continue; // تحقق إضافي
 
-                    // يمكن لـ A أن يأكل B إذا كان حجم A أكبر بنسبة 10%
-                    if (cellA.size > cellB.size * 1.1 && distance < cellA.size) {
-                        cellA.size += Math.sqrt(cellB.size); // زيادة الحجم
-                        playerA.score += cellB.size * cellB.size;
-                        // إزالة الخلية المأكولة
-                        playerB.cells.splice(playerB.cells.indexOf(cellB), 1);
-                    }
-                    // يمكن لـ B أن يأكل A إذا كان حجم B أكبر بنسبة 10%
-                    else if (cellB.size > cellA.size * 1.1 && distance < cellB.size) {
-                        cellB.size += Math.sqrt(cellA.size); // زيادة الحجم
-                        playerB.score += cellA.size * cellA.size;
-                        // إزالة الخلية المأكولة
-                        playerA.cells.splice(playerA.cells.indexOf(cellA), 1);
+            // تحقق من اصطدام كل خلية من A بكل خلية من B
+            playerA.cells.forEach(cellA => {
+                // التصحيح: يجب التأكد من وجود playerB.cells
+                if (!playerB.cells) return;
+
+                playerB.cells.forEach(cellB => {
+                    const distance = Math.sqrt((cellA.x - cellB.x)**2 + (cellA.y - cellB.y)**2);
+
+                    // شرط الأكل: يجب أن تكون الخلية الآكلة أكبر بكثير
+                    const EAT_THRESHOLD = 1.1; // يجب أن تكون أكبر بنسبة 10%
+                    const mergeThreshold = 1.0; // إذا كانت الأحجام متقاربة، يمكنها الاندماج
+
+                    if (distance < cellA.size && distance < cellB.size) {
+                        // حالة الأكل
+                        if (cellA.size > cellB.size * EAT_THRESHOLD) {
+                            cellA.mass += cellB.mass;
+                            cellA.size = Math.sqrt(cellA.mass / Math.PI);
+                            playerA.score = cellA.mass;
+
+                            // إزالة الخلية المأكولة من اللاعب B
+                            playerB.cells = playerB.cells.filter(c => c.id !== cellB.id);
+
+                        } else if (cellB.size > cellA.size * EAT_THRESHOLD) {
+                            cellB.mass += cellA.mass;
+                            cellB.size = Math.sqrt(cellB.mass / Math.PI);
+                            playerB.score = cellB.mass;
+
+                            // إزالة الخلية المأكولة من اللاعب A
+                            playerA.cells = playerA.cells.filter(c => c.id !== cellA.id);
+                        }
                     }
                 });
             });
 
-            // إزالة اللاعبين الذين فقدوا كل خلاياهم
-            if (playerA.cells.length === 0) delete players[playerA.id];
-            if (playerB.cells.length === 0) delete players[playerB.id];
+            // إزالة اللاعبين الذين لم يتبق لهم خلايا
+            if (playerA.cells.length === 0) {
+                delete players[playerA.id];
+                if (playerA.ws) playerA.ws.close(); // إغلاق اتصال اللاعب البشري
+                bots = bots.filter(id => id !== playerA.id); // إزالة من قائمة البوتات
+            }
+            if (playerB.cells.length === 0) {
+                delete players[playerB.id];
+                if (playerB.ws) playerB.ws.close();
+                bots = bots.filter(id => id !== playerB.id);
+            }
         }
     }
 }
 
-// --- دالة الانقسام (Splitting) ---
-function splitCell(player, cellId, targetX, targetY) {
-    const originalCell = player.cells.find(c => c.id === cellId);
 
-    if (!originalCell || originalCell.size < 40 || player.cells.length >= 16) {
-        return; // لا يمكن الانقسام إذا كانت الخلية صغيرة جداً أو كان اللاعب لديه 16 خلية
-    }
+// ----------------------
+// دالة تحديث اللعبة الرئيسية
+// ----------------------
 
-    const newSize = originalCell.size / 2;
-    originalCell.size = newSize;
+let lastTime = Date.now();
 
-    const dx = targetX - originalCell.x;
-    const dy = targetY - originalCell.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-
-    const splitDistance = newSize * 3; // المسافة التي ستنطلق فيها الخلية الجديدة
-
-    const newCellX = originalCell.x + (dx / dist) * splitDistance;
-    const newCellY = originalCell.y + (dy / dist) * splitDistance;
-
-    const newCell = createCell(
-        nextPlayerId++,
-        newCellX,
-        newCellY,
-        newSize,
-        player.name,
-        player.isBot
-    );
-
-    // الخلية المنقسمة تنطلق في اتجاه مؤشر الفأرة/الهدف
-    newCell.targetX = newCellX + (dx / dist) * 100;
-    newCell.targetY = newCellY + (dy / dist) * 100;
-
-    player.cells.push(newCell);
-}
-
-// --- دالة تحديث حالة اللعبة (Game Loop) ---
 function updateGame() {
-    // تحديث الروبوتات
-    for (const id in players) {
-        const player = players[id];
-        if (player.isBot) {
-            updateBot(player);
-            // تطبيق الحركة على خلايا البوتات
-            player.cells.forEach(cell => {
-                moveCell(cell, player.targetX, player.targetY);
-            });
-        } else {
-            // تطبيق الحركة على خلايا اللاعبين البشر
-            player.cells.forEach(cell => {
-                moveCell(cell, player.targetX, player.targetY);
-            });
-        }
-    }
+    const now = Date.now();
+    const deltaTime = (now - lastTime) / 1000; // الفرق بالثواني
+    lastTime = now;
 
-    // التحقق من الاصطدامات (أكل الطعام واللاعبين)
+    // 1. تحديث منطق البوتات
+    updateBotAI();
+
+    // 2. تحديث الحركة
+    updateMovement(deltaTime);
+
+    // 3. التحقق من الاصطدامات
     checkCollisions();
 
-    // إضافة روبوتات جديدة إذا لزم الأمر
-    const botCount = Object.values(players).filter(p => p.isBot).length;
-    if (botCount < MAX_BOTS) {
-        addPlayer('Bot ' + (botCount + 1), true);
+    // 4. إرسال حالة اللعبة المحدثة إلى جميع العملاء
+    broadcastGameState();
+
+    // 5. إعادة توليد البوتات المفقودة
+    while (bots.length < BOT_COUNT) {
+        createPlayer(true);
     }
+}
 
-    // تجميع البيانات لإرسالها للعملاء
+// تشغيل حلقة اللعبة الرئيسية بمعدل 60 إطار في الثانية
+setInterval(updateGame, GAME_TICK);
+
+
+// ------------------------------------------------------------------
+// منطق WebSocket
+// ------------------------------------------------------------------
+
+function broadcastGameState() {
     const leaderboard = Object.values(players)
+        .filter(p => p.cells.length > 0)
+        .map(p => ({ name: p.name, score: Math.floor(p.score) }))
         .sort((a, b) => b.score - a.score)
-        .slice(0, 10)
-        .map(p => ({ name: p.name, score: Math.round(p.score) }));
+        .slice(0, 10);
 
-    const gameState = {
-        players: Object.values(players).flatMap(p => p.cells), // إرسال الخلايا فقط
-        food: food,
-        leaderboard: leaderboard
+    const state = {
+        players: Object.values(players).map(p => ({
+            id: p.id,
+            name: p.name,
+            cells: p.cells.map(c => ({
+                x: Math.round(c.x),
+                y: Math.round(c.y),
+                size: Math.round(c.size),
+                color: c.color
+            }))
+        })),
+        food: food.map(f => ({
+            x: Math.round(f.x),
+            y: Math.round(f.y),
+            color: f.color
+        })),
+        leaderboard: leaderboard,
+        mapWidth: MAP_WIDTH,
+        mapHeight: MAP_HEIGHT
     };
 
-    // إرسال حالة اللعبة لكل العملاء
+    const message = JSON.stringify(state);
+
+    // إرسال حالة اللعبة إلى كل لاعب متصل
     wss.clients.forEach(client => {
         if (client.readyState === WebSocket.OPEN) {
-            client.send(JSON.stringify(gameState));
+            client.send(message);
         }
     });
 }
 
-// إضافة الطعام الأولي
-for (let i = 0; i < MAX_FOOD; i++) {
-    addFood();
-}
+wss.on('connection', function connection(ws, req) {
+    console.log('Client connected from:', req.headers['x-forwarded-for'] || req.socket.remoteAddress);
 
-// بدء حلقة اللعبة
-setInterval(updateGame, GAME_SPEED);
+    // إنشاء لاعب جديد للاتصال
+    const newPlayer = createPlayer(false);
+    newPlayer.ws = ws; // ربط اتصال WebSocket بكائن اللاعب
+    console.log(`New player created with ID: ${newPlayer.id}`);
 
-// --- التعامل مع اتصال WebSocket ---
-wss.on('connection', function connection(ws) {
-    let playerId = null;
+    // إرسال معلومات اللاعب إلى العميل
+    ws.send(JSON.stringify({ type: 'init', playerId: newPlayer.id }));
 
-    // استقبال رسائل من العميل
+    // معالجة الرسائل الواردة
     ws.on('message', function incoming(message) {
         try {
             const data = JSON.parse(message);
 
-            if (data.type === 'init') {
-                // رسالة تهيئة (تسجيل الدخول)
-                const newPlayer = addPlayer(data.name || 'Anonymous');
-                playerId = newPlayer.id;
-
-                // إرسال معلومات اللاعب الجديد للعميل
-                ws.send(JSON.stringify({ type: 'init', id: playerId, mapWidth: MAP_WIDTH, mapHeight: MAP_HEIGHT }));
-            } else if (data.type === 'move' && playerId) {
-                // رسالة حركة (تحديث موقع الفأرة)
-                const player = players[playerId];
-                if (player) {
-                    player.targetX = data.x;
-                    player.targetY = data.y;
-                }
-            } else if (data.type === 'split' && playerId) {
-                // رسالة انقسام
-                const player = players[playerId];
-                if (player && player.cells.length > 0) {
-                    // انقسام الخلية الأكبر (أو كل الخلايا لاحقاً)
-                    player.cells.forEach(cell => {
-                        splitCell(player, cell.id, player.targetX, player.targetY);
-                    });
-                }
+            if (data.type === 'move' && newPlayer.cells.length > 0) {
+                // تحديث موقع الهدف للاعب
+                newPlayer.targetX = data.x;
+                newPlayer.targetY = data.y;
             }
         } catch (e) {
-            // console.error('Error parsing message:', e);
+            console.error('Error parsing message:', e);
         }
     });
 
-    // عند إغلاق الاتصال
+    // معالجة قطع الاتصال
     ws.on('close', () => {
-        if (playerId) {
-            delete players[playerId]; // إزالة اللاعب من الخادم
-        }
+        console.log(`Player ${newPlayer.id} disconnected.`);
+        // إزالة اللاعب من قائمة اللاعبين
+        delete players[newPlayer.id];
+    });
+
+    // معالجة الأخطاء
+    ws.on('error', (err) => {
+        console.error(`WebSocket error for player ${newPlayer.id}:`, err);
     });
 });
 
-// --- بدء خادم HTTP والاستماع للمنفذ ---
+// ----------------------
+// تشغيل الخادم
+// ----------------------
 server.listen(PORT, () => {
     console.log(`HTTP Server running on port ${PORT}`);
     console.log(`WebSocket connections should use WSS at: wss://${USER_SERVER_DOMAIN}`);
+    
+    // تهيئة اللعبة عند بدء تشغيل الخادم
+    initializeFood();
+    for (let i = 0; i < BOT_COUNT; i++) {
+        createPlayer(true);
+    }
 });

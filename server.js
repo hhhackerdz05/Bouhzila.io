@@ -1,5 +1,5 @@
 const { WebSocketServer } = require('ws');
-const http = require('http');
+const http = require('http'); // 1. تم إضافة استيراد خادم HTTP
 
 // استيراد منطق اللعبة
 const Game = require('./game');
@@ -7,22 +7,16 @@ const Game = require('./game');
 // **التحديث:** يجب أن يستمع الخادم على المنفذ المحدد من قِبل بيئة الاستضافة (Render)
 const PORT = process.env.PORT || 10000;
 
-// إنشاء خادم HTTP عادي
-// هذا الخادم هو ما سيستمع إليه Render
+// 2. إنشاء خادم HTTP عادي
+// هذا الخادم هو ما سيستمع إليه Render لجميع الاتصالات، بما في ذلك ترقية WebSocket
 const server = http.createServer((req, res) => {
-    // يمكن هنا إضافة منطق بسيط للتحقق من الصحة (Health Check) إذا لزم الأمر
-    if (req.url === '/health') {
-        res.writeHead(200, { 'Content-Type': 'text/plain' });
-        res.end('Server is healthy and running.');
-    } else {
-        res.writeHead(404);
-        res.end('Not Found');
-    }
+    // يمكنك استخدام هذا للتحقق من الصحة، وإلا فسيتم إرجاع 404
+    res.writeHead(404);
+    res.end('Not Found');
 });
 
-// إنشاء خادم WebSocket باستخدام خادم HTTP الأساسي
-// هذا يضمن أن wss يعمل بشكل صحيح خلف proxy Render
-// التحديث الحاسم: إضافة خيار path: '/'
+// 3. إنشاء خادم WebSocket باستخدام خادم HTTP الأساسي
+// إضافة خيار path: '/' لضمان توجيه حركة المرور بشكل صحيح عبر Proxy Render
 const wss = new WebSocketServer({ server, path: '/' }); 
 
 // إنشاء مثيل للعبة
@@ -57,7 +51,7 @@ wss.on('connection', (ws, req) => {
                         player.targetY = data.y;
                     }
                     break;
-                // يمكن إضافة أنواع رسائل أخرى (مثل الانقسام، التسريع) هنا
+                // يمكن إضافة أنواع رسائل أخرى هنا
             }
         } catch (e) {
             console.error('Error processing message:', e.message);
@@ -76,10 +70,10 @@ wss.on('connection', (ws, req) => {
     });
 });
 
-// بدء الاستماع على خادم HTTP
+// 4. بدء الاستماع على خادم HTTP بدلاً من WebSocket مباشرة
 server.listen(PORT, () => {
     console.log(`HTTP Server running on port ${PORT}`);
-    console.log(`WebSocket connections should use WSS at: wss://<your-render-service-name>.onrender.com`);
+    console.log(`WebSocket connections should use WSS at: wss://<your-render-service-name>.onrender.com/`);
     
     // تشغيل حلقة تحديث اللعبة
     game.startGameLoop();

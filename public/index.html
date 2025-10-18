@@ -1,442 +1,430 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bouhzila.io</title>
-    <!-- تضمين خط Inter من جوجل (لأجل التناسق) -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+    <title>Bouhzila.io - لعبة البوحزيلة</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        :root {
-            --primary-color: #e74c3c; /* أحمر للحركة */
-            --secondary-color: #3498db; /* أزرق */
-            --background-color: #111;
-            --dark-surface: #1a1a1a;
-            --text-color: #fff;
-        }
-
+        /* خط رقمي رياضي */
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
+        
         body {
+            font-family: 'Orbitron', sans-serif;
             margin: 0;
             overflow: hidden;
             display: flex;
             justify-content: center;
             align-items: center;
             min-height: 100vh;
-            background-color: var(--background-color);
-            color: var(--text-color);
-            font-family: 'Inter', sans-serif;
-            flex-direction: column;
-            position: relative;
+            background-color: #0d0d21; /* خلفية داكنة جداً */
+            color: #E0E0FF;
         }
         
-        /* تصميم الواجهة الجذابة (الواجهة الرئيسية) */
-        #main-splash {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 20;
-            background-color: rgba(0, 0, 0, 0.9); /* خلفية داكنة */
-            text-align: center;
-            opacity: 1;
-            transition: opacity 0.5s ease;
+        #gameCanvas {
+            border-radius: 12px;
+            box-shadow: 0 0 50px rgba(75, 0, 130, 0.7); /* ظل بنفسجي ساطع */
+            background-color: #1a0a2e; /* خلفية حقل اللعب */
+            cursor: crosshair;
+            transition: box-shadow 0.3s ease-in-out;
+        }
+        #gameCanvas:hover {
+            box-shadow: 0 0 60px rgba(100, 0, 160, 0.9);
         }
 
-        #splash-title {
-            font-family: 'Inter', sans-serif;
-            font-size: 8vw; /* حجم كبير ومتجاوب */
-            font-weight: 900;
-            color: transparent;
-            background-image: linear-gradient(45deg, #ff00ff, #ff66ff, #cc66cc);
-            -webkit-background-clip: text;
-            background-clip: text;
-            text-shadow: 0 0 15px rgba(255, 0, 255, 0.5);
-            margin-bottom: 0.2em;
-        }
-
-        #splash-subtitle {
-            font-size: 1.5vw;
-            color: #ccc;
-            margin-bottom: 2em;
-        }
-        
-        #name-input-splash {
-            padding: 15px;
-            font-size: 1.2rem;
-            border: none;
+        .ui-panel {
+            background-color: rgba(26, 10, 46, 0.9); /* خلفية شبه شفافة داكنة */
+            backdrop-filter: blur(5px);
             border-radius: 8px;
-            text-align: center;
-            width: 80%;
-            max-width: 350px;
-            background-color: rgba(255, 255, 255, 0.9);
-            color: var(--background-color);
-            margin-bottom: 20px;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
-        }
-
-        #start-button {
-            padding: 15px 50px;
-            font-size: 1.5rem;
-            background-color: var(--primary-color);
-            color: var(--text-color);
-            border: none;
-            border-radius: 50px;
-            cursor: pointer;
-            transition: background-color 0.3s, transform 0.1s, box-shadow 0.3s;
-            box-shadow: 0 8px 25px rgba(231, 76, 60, 0.7);
-            font-weight: 700;
-        }
-        #start-button:hover {
-            background-color: #c0392b;
-            transform: scale(1.05);
-            box-shadow: 0 10px 30px rgba(231, 76, 60, 0.9);
-        }
-        
-        /* حالة الاتصال (رسالة بسيطة أسفل العنوان) */
-        #connection-status {
-            margin-top: 15px;
-            font-size: 1.2rem;
-            color: #f1c40f; /* لون تحذيري */
-            display: none;
-        }
-
-        /* ----- تصميم اللعبة الفعلية (Canvas) ----- */
-
-        canvas {
-            display: none; /* يتم إظهاره عند بدء اللعب */
-            background-color: var(--dark-surface);
+            padding: 1.25rem;
+            border: 1px solid #4a0e7e; /* إطار بنفسجي خفيف */
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            color: #E0E0FF;
             z-index: 10;
         }
 
-        #leaderboard {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background-color: rgba(0, 0, 0, 0.5);
-            padding: 10px;
-            border-radius: 8px;
-            color: white;
-            z-index: 11;
-            width: 180px;
-            font-size: 14px;
-            display: none; /* يظهر عند بدء اللعب */
-        }
-        #leaderboard h3 {
-            margin-top: 0;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.3);
-            padding-bottom: 5px;
-            margin-bottom: 5px;
-        }
-        .leader-item {
+        /* لوحة القيادة العلوية */
+        #dashboard {
+            width: 90%;
+            max-width: 600px;
             display: flex;
             justify-content: space-between;
-            margin-bottom: 3px;
+            align-items: center;
+            padding: 0.75rem 1.5rem;
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
         }
-        
-        /* رسم الفقاعات الزخرفية على الواجهة الرئيسية (لجعلها مثل الصورة) */
-        .bubble {
-            position: absolute;
-            border-radius: 50%;
-            animation: moveBubble 15s infinite alternate ease-in-out;
-            opacity: 0.6;
-            filter: blur(5px);
-            pointer-events: none;
+        .dashboard-item span {
+            font-weight: 900;
+            color: #8A2BE2; /* لون بنفسجي ساطع للقيم */
         }
-        .bubble:nth-child(1) { top: 10%; left: 5%; width: 200px; height: 200px; background-color: rgba(255, 0, 150, 0.5); animation-duration: 18s; }
-        .bubble:nth-child(2) { bottom: 5%; right: 15%; width: 300px; height: 300px; background-color: rgba(0, 150, 255, 0.4); animation-duration: 22s; }
-        .bubble:nth-child(3) { top: 30%; right: 10%; width: 150px; height: 150px; background-color: rgba(0, 255, 50, 0.3); animation-duration: 16s; }
-        .bubble:nth-child(4) { bottom: 20%; left: 25%; width: 100px; height: 100px; background-color: rgba(255, 150, 0, 0.6); animation-duration: 20s; }
 
-        @keyframes moveBubble {
-            0% { transform: translate(0, 0) scale(1); }
-            50% { transform: translate(100px, 50px) scale(1.1); }
-            100% { transform: translate(0, 0) scale(1); }
+        /* قائمة المتصدرين */
+        #leaderboard-list li {
+            padding: 0.4rem 0;
+            border-bottom: 1px dashed rgba(74, 14, 126, 0.5); /* خط منقط خفيف */
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9rem;
+            transition: background-color 0.2s;
         }
+        #leaderboard-list li:last-child {
+            border-bottom: none;
+        }
+        #leaderboard-list li:nth-child(1) { color: #FFD700; /* ذهبي */ font-weight: 900; }
+        #leaderboard-list li:nth-child(2) { color: #C0C0C0; /* فضي */ }
+        #leaderboard-list li:nth-child(3) { color: #CD7F32; /* برونزي */ }
     </style>
 </head>
 <body>
-    <!-- الفقاعات الزخرفية -->
-    <div class="bubble"></div>
-    <div class="bubble"></div>
-    <div class="bubble"></div>
-    <div class="bubble"></div>
 
-    <canvas id="gameCanvas"></canvas>
+    <!-- Main Game Container -->
+    <div id="game-container" class="relative flex flex-col items-center">
+        
+        <!-- Dashboard (Score & FPS) -->
+        <div id="dashboard" class="ui-panel hidden">
+            <div class="dashboard-item">
+                الدرجة (Score): <span id="current-score">0</span>
+            </div>
+            <div class="dashboard-item text-xs text-gray-400">
+                معدل الإطار (FPS): <span id="fps-display">--</span>
+            </div>
+        </div>
 
-    <div id="main-splash">
-        <h1 id="splash-title">Bouhzila.io</h1>
-        <p id="splash-subtitle">تغذى على الخلايا الأصغر لتنمو وتصبح الأكبر!</p>
-        <input type="text" id="name-input-splash" placeholder="أدخل اسمك..." maxlength="12">
-        <button id="start-button">ابدأ اللعب الآن</button>
-        <div id="connection-status" style="display: none;">جاري الاتصال...</div>
-    </div>
+        <canvas id="gameCanvas"></canvas>
 
-    <div id="leaderboard">
-        <h3>لوحة المتصدرين</h3>
-        <div id="leaderboard-list"></div>
+        <!-- UI Elements -->
+        <div id="connection-status" class="absolute top-4 left-4 text-sm px-3 py-1 rounded-full transition-colors duration-300 bg-red-800 text-white font-bold">
+            جاري الاتصال...
+        </div>
+
+        <!-- Leaderboard -->
+        <div id="leaderboard" class="ui-panel absolute top-4 right-4 w-64 hidden md:block">
+            <h3 class="text-xl font-bold mb-3 text-center border-b border-purple-600 pb-2">لوحة المتصدرين</h3>
+            <ul id="leaderboard-list" class="text-sm">
+                <!-- سيتم إدراج عناصر لوحة المتصدرين هنا -->
+            </ul>
+        </div>
+
+        <!-- Name Input Modal -->
+        <div id="name-modal" class="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50">
+            <div class="ui-panel max-w-lg w-full p-8 text-center border-2 border-purple-700">
+                <h1 class="text-4xl font-black mb-6 text-purple-400">Bouhzila.io</h1>
+                <h2 class="text-xl mb-6">أدخل اسمك للانضمام إلى المعركة!</h2>
+                <input type="text" id="player-name-input" placeholder="اسم البوحزيلة الخاص بك..." class="w-full p-4 rounded-lg mb-6 text-black bg-white focus:ring-4 focus:ring-purple-500 transition duration-150 border-none text-lg">
+                <button id="start-game-button" class="w-full bg-purple-600 hover:bg-purple-500 active:bg-purple-700 text-white font-black py-4 rounded-lg transition duration-200 shadow-xl shadow-purple-900/50 transform hover:scale-[1.02]">
+                    العب الآن
+                </button>
+            </div>
+        </div>
+
     </div>
 
     <script>
-        // المتغيرات العالمية للعبة والاتصال
+        // --- GAME CLIENT LOGIC ---
+
+        // Global state and constants
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        const splashScreen = document.getElementById('main-splash');
-        const startButton = document.getElementById('start-button');
-        const nameInput = document.getElementById('name-input-splash');
-        const leaderboardDiv = document.getElementById('leaderboard');
+        const nameModal = document.getElementById('name-modal');
+        const playerNameInput = document.getElementById('player-name-input');
+        const startGameButton = document.getElementById('start-game-button');
         const connectionStatus = document.getElementById('connection-status');
-        
-        // **التصحيح الحاسم: عنوان خادم WebSocket الصحيح**
-        const WS_URL = 'wss://bouhzila-io-1.onrender.com';
+        const leaderboardList = document.getElementById('leaderboard-list');
+        const currentScoreDisplay = document.getElementById('current-score');
+        const fpsDisplay = document.getElementById('fps-display');
+        const dashboard = document.getElementById('dashboard');
 
         let ws = null;
-        let gameData = { players: [], food: [], mapWidth: 0, mapHeight: 0, leaderboard: [] };
-        let myPlayerId = null;
-        let cameraX = 0;
-        let cameraY = 0;
-        let zoom = 1;
-        let mouseX = 0;
-        let mouseY = 0;
-        let isPlaying = false;
+        let gameState = { players: [], food: [] };
+        let myId = null;
+        let myPlayer = null;
+        let worldSize = { width: 3000, height: 3000 };
+        let camera = { x: 0, y: 0 };
+        let mousePos = { x: 0, y: 0 };
+        let lastInputTime = 0;
+        const INPUT_DELAY = 1000 / 60; // Send input at 60 FPS
 
-        // --------------------------------------------------------
-        // إعداد Canvas
-        // --------------------------------------------------------
+        // FPS tracking
+        let lastFrameTime = performance.now();
+        let fps = 0;
 
-        function setupCanvas() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-            // يجب أن يتم استدعاء draw() مرة واحدة في نهاية السكريبت
-        }
+        // --- التحديث الحاسم: استخدام رابط WSS الثابت من سجلات الخادم ---
+        // العنوان الثابت للخادم الخلفي الذي يعمل على Render
+        const SERVER_URL = 'wss://bouhzila-io-1.onrender.com';
 
-        window.addEventListener('resize', setupCanvas);
-        setupCanvas();
 
-        // --------------------------------------------------------
-        // منطق WebSocket
-        // --------------------------------------------------------
+        // --- Connection Management ---
 
-        function connectToServer(playerName) {
-            connectionStatus.style.display = 'block';
-            connectionStatus.textContent = 'جاري الاتصال بالخادم...';
+        function connectToServer() {
+            // Update status and try to connect
+            connectionStatus.textContent = 'جاري الاتصال...';
+            connectionStatus.className = 'absolute top-4 left-4 text-sm px-3 py-1 rounded-full bg-yellow-600 text-white font-bold';
 
-            // إذا كان الاتصال موجوداً، أغلقه أولاً
-            if (ws) ws.close();
+            console.log(`Attempting connection to: ${SERVER_URL}`);
 
-            ws = new WebSocket(WS_URL);
+            try {
+                // استخدام الرابط الثابت مباشرة
+                ws = new WebSocket(SERVER_URL);
+            } catch (error) {
+                console.error("WebSocket creation failed (Check browser support or URL protocol):", error);
+                connectionStatus.textContent = 'فشل الاتصال';
+                connectionStatus.className = 'absolute top-4 left-4 text-sm px-3 py-1 rounded-full bg-red-600 text-white font-bold';
+                return;
+            }
 
             ws.onopen = () => {
-                console.log('Connected to WebSocket server.');
-                connectionStatus.textContent = 'تم الاتصال. جاري بدء اللعب...';
-                
-                // إرسال الاسم عند الاتصال
-                ws.send(JSON.stringify({ type: 'join', name: playerName }));
-
-                isPlaying = true;
-                splashScreen.style.opacity = 0;
-                splashScreen.style.pointerEvents = 'none';
-                canvas.style.display = 'block';
-                leaderboardDiv.style.display = 'block';
+                connectionStatus.textContent = 'متصل';
+                connectionStatus.className = 'absolute top-4 left-4 text-sm px-3 py-1 rounded-full bg-green-600 text-white font-bold';
+                console.log('WebSocket connected.');
             };
 
             ws.onmessage = (event) => {
                 const data = JSON.parse(event.data);
-                
+
                 if (data.type === 'init') {
-                    myPlayerId = data.playerId;
-                    console.log('My Player ID:', myPlayerId);
+                    myId = data.id;
+                    worldSize = data.world;
+                    console.log('Received initial setup. My ID:', myId);
+                    // Show the name modal after connection
+                    nameModal.classList.remove('hidden');
                 } else {
-                    gameData = data;
+                    // This is the game state update
+                    gameState = data;
                 }
             };
 
-            ws.onclose = () => {
-                console.log('Disconnected from WebSocket server.');
-                isPlaying = false;
-                myPlayerId = null;
-                // إظهار شاشة البداية مع رسالة الخطأ
-                connectionStatus.textContent = 'انقطع الاتصال بالخادم. حاول مجدداً.';
-                splashScreen.style.opacity = 1;
-                splashScreen.style.pointerEvents = 'auto';
-                canvas.style.display = 'none';
-                leaderboardDiv.style.display = 'none';
+            ws.onclose = (event) => {
+                connectionStatus.textContent = 'تم قطع الاتصال';
+                connectionStatus.className = 'absolute top-4 left-4 text-sm px-3 py-1 rounded-full bg-red-600 text-white font-bold';
+                console.warn(`WebSocket disconnected (Code: ${event.code}). Attempting reconnect in 3s...`);
+                setTimeout(connectToServer, 3000); // Attempt to reconnect
             };
 
             ws.onerror = (error) => {
-                console.error('WebSocket Error:', error);
-                connectionStatus.textContent = 'فشل الاتصال بالخادم.';
+                console.error('WebSocket error occurred! This often means the server URL is wrong, the server is down, or a protocol mismatch (http vs https/ws vs wss). Check the SERVER_URL:', SERVER_URL, error);
             };
         }
 
-        startButton.addEventListener('click', () => {
-            let playerName = nameInput.value.trim();
-            if (playerName.length < 2) {
-                // بدلاً من alert()، يمكن استخدام رسالة حالة
-                connectionStatus.textContent = 'الرجاء إدخال اسم لا يقل عن حرفين.';
-                connectionStatus.style.display = 'block';
-                return;
-            }
-            connectToServer(playerName);
-        });
-        
-        // --------------------------------------------------------
-        // منطق الإدخال (الماوس)
-        // --------------------------------------------------------
+        // Custom Modal / Alert (replaces alert() and confirm())
+        function alertUser(title, message) {
+            const existingModal = document.getElementById('custom-alert-modal');
+            if (existingModal) existingModal.remove();
 
-        canvas.addEventListener('mousemove', (e) => {
-            mouseX = e.clientX;
-            mouseY = e.clientY;
-        });
-
-        function sendMovement() {
-            if (!ws || ws.readyState !== WebSocket.OPEN || !myPlayerId || !isPlaying) return;
-
-            // تحويل إحداثيات الشاشة إلى إحداثيات الخريطة (عكس الكاميرا والتكبير)
-            const mapX = (mouseX - canvas.width / 2) / zoom + cameraX;
-            const mapY = (mouseY - canvas.height / 2) / zoom + cameraY;
-
-            ws.send(JSON.stringify({
-                type: 'move',
-                x: mapX,
-                y: mapY
-            }));
+            const modalHtml = `
+                <div id="custom-alert-modal" class="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-[100]">
+                    <div class="ui-panel max-w-sm w-full p-6 text-center border-2 border-red-500">
+                        <h3 class="text-xl font-bold mb-3 text-red-400">${title}</h3>
+                        <p class="text-sm mb-6 text-white">${message}</p>
+                        <button onclick="document.getElementById('custom-alert-modal').remove()" class="w-full bg-blue-600 hover:bg-blue-700 font-bold py-2 rounded-lg transition duration-150">
+                            حسناً
+                        </button>
+                    </div>
+                </div>
+            `;
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
         }
-        
-        // إرسال الحركة 20 مرة في الثانية
-        setInterval(sendMovement, 1000 / 20); 
 
-        // --------------------------------------------------------
-        // منطق الرسم والتحديث
-        // --------------------------------------------------------
+        // --- Rendering and Drawing ---
 
-        function draw() {
+        function drawGame() {
+            const now = performance.now();
+            const delta = now - lastFrameTime;
+            lastFrameTime = now;
+            fps = Math.round(1000 / delta);
+
+            // 1. Clear the canvas
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            const myPlayer = gameData.players.find(p => p.id === myPlayerId);
-            
-            // تحديث الكاميرا والتكبير بناءً على حجم اللاعب
-            if (myPlayer && myPlayer.cells.length > 0) {
-                // نعتبر الخلية الأكبر للتحكم في الكاميرا
-                const mainCell = myPlayer.cells[0]; 
-                
-                // تحديث موقع الكاميرا ليكون متمركزًا على اللاعب
-                cameraX = mainCell.x;
-                cameraY = mainCell.y;
-                
-                // حساب التكبير: الخلايا الأكبر ترى مساحة أكبر (تكبير أقل)
-                const baseZoom = 0.8;
-                const minZoom = 0.3;
-                const maxCellSize = mainCell.size; 
-                
-                zoom = Math.max(minZoom, baseZoom / Math.log10(maxCellSize + 10));
-                
-            } else if (isPlaying) {
-                // اللاعب مات، لكنه ما زال في اللعبة (قد نرسل رسالة "لقد مت")
-                // يمكننا جعل الكاميرا تركز على مركز الخريطة هنا
-                cameraX = gameData.mapWidth / 2 || 2000;
-                cameraY = gameData.mapHeight / 2 || 2000;
-                zoom = 0.5; // تكبير ثابت للمشاهدة
-            } else {
-                // شاشة البداية
-                requestAnimationFrame(draw);
-                return;
+            // 2. Center the camera on the current player
+            myPlayer = gameState.players.find(p => p.id === myId);
+            if (myPlayer) {
+                camera.x = myPlayer.x - canvas.width / 2;
+                camera.y = myPlayer.y - canvas.height / 2;
+                currentScoreDisplay.textContent = Math.floor(myPlayer.score); // تحديث الدرجة في الداشبورد
+                fpsDisplay.textContent = fps; // تحديث معدل الإطار
             }
 
-            ctx.save();
-            // تطبيق الترجمة (لتحريك الكاميرا) والتكبير
-            ctx.translate(canvas.width / 2, canvas.height / 2);
-            ctx.scale(zoom, zoom);
-            ctx.translate(-cameraX, -cameraY);
+            // 3. Draw the Game Boundary (Background)
+            ctx.fillStyle = '#080514'; // لون خلفية أغمق
+            ctx.fillRect(0 - camera.x, 0 - camera.y, worldSize.width, worldSize.height);
 
-            // 1. رسم شبكة الخريطة
-            drawGrid();
-            
-            // 2. رسم الطعام
-            gameData.food.forEach(f => {
-                ctx.beginPath();
-                ctx.arc(f.x, f.y, 3, 0, 2 * Math.PI); // حجم ثابت 3 للطعام
-                ctx.fillStyle = f.color;
-                ctx.fill();
-            });
-
-            // 3. رسم اللاعبين (والبوتات)
-            gameData.players.forEach(player => {
-                player.cells.forEach(cell => {
-                    // رسم الخلية
-                    ctx.beginPath();
-                    ctx.arc(cell.x, cell.y, cell.size, 0, 2 * Math.PI);
-                    ctx.fillStyle = cell.color;
-                    ctx.fill();
-                    ctx.strokeStyle = '#222';
-                    ctx.lineWidth = 3;
-                    ctx.stroke();
-
-                    // رسم الاسم (فوق الخلية الرئيسية)
-                    ctx.fillStyle = '#fff';
-                    ctx.font = `${Math.max(10, cell.size / 3)}px Inter`;
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    ctx.fillText(player.name, cell.x, cell.y);
-                });
-            });
-
-            ctx.restore();
-            
-            // تحديث لوحة المتصدرين
-            updateLeaderboard(gameData.leaderboard);
-
-            requestAnimationFrame(draw);
-        }
-
-        function drawGrid() {
-            const gridSize = 50;
-            const gridColor = '#333';
-            ctx.strokeStyle = gridColor;
+            // Draw a grid pattern for better visual context
+            const gridSize = 100;
+            ctx.strokeStyle = '#220d3f'; // لون شبكة خفيف
             ctx.lineWidth = 1;
 
-            // تحديد حدود الرؤية
-            const viewLeft = cameraX - canvas.width / 2 / zoom;
-            const viewTop = cameraY - canvas.height / 2 / zoom;
-            const viewRight = cameraX + canvas.width / 2 / zoom;
-            const viewBottom = cameraY + canvas.height / 2 / zoom;
-            
-            // خطوط عمودية
-            for (let x = viewLeft - (viewLeft % gridSize); x < viewRight; x += gridSize) {
+            for (let x = 0; x < worldSize.width; x += gridSize) {
                 ctx.beginPath();
-                ctx.moveTo(x, viewTop);
-                ctx.lineTo(x, viewBottom);
+                ctx.moveTo(x - camera.x, 0 - camera.y);
+                ctx.lineTo(x - camera.x, worldSize.height - camera.y);
+                ctx.stroke();
+            }
+            for (let y = 0; y < worldSize.height; y += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(0 - camera.x, y - camera.y);
+                ctx.lineTo(worldSize.width - camera.x, y - camera.y);
                 ctx.stroke();
             }
 
-            // خطوط أفقية
-            for (let y = viewTop - (viewTop % gridSize); y < viewBottom; y += gridSize) {
+            // Draw border
+            ctx.strokeStyle = '#4a0e7e';
+            ctx.lineWidth = 15;
+            ctx.strokeRect(0 - camera.x, 0 - camera.y, worldSize.width, worldSize.height);
+
+
+            // 4. Draw Food
+            gameState.food.forEach(f => {
                 ctx.beginPath();
-                ctx.moveTo(viewLeft, y);
-                ctx.lineTo(viewRight, y);
+                ctx.arc(f.x - camera.x, f.y - camera.y, f.r, 0, Math.PI * 2);
+                ctx.fillStyle = f.color;
+                ctx.fill();
+                ctx.closePath();
+            });
+
+            // 5. Draw Players
+            gameState.players.forEach(p => {
+                // Skip if player is too far off-screen (optimization)
+                if (p.x + p.r < camera.x || p.x - p.r > camera.x + canvas.width ||
+                    p.y + p.r < camera.y || p.y - p.r > camera.y + canvas.height) {
+                    return;
+                }
+
+                // Draw the body circle
+                ctx.beginPath();
+                ctx.arc(p.x - camera.x, p.y - camera.y, p.r, 0, Math.PI * 2);
+                
+                // Shadow for depth
+                ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+                ctx.shadowBlur = 10;
+                ctx.shadowOffsetX = 3;
+                ctx.shadowOffsetY = 3;
+
+                ctx.fillStyle = p.color;
+                ctx.fill();
+                
+                // Reset shadow for subsequent drawings
+                ctx.shadowBlur = 0;
+                ctx.shadowOffsetX = 0;
+                ctx.shadowOffsetY = 0;
+
+                // Draw a thick outline
+                ctx.strokeStyle = '#1e1e1e';
+                ctx.lineWidth = 6;
                 ctx.stroke();
+                ctx.closePath();
+
+                // Draw the name and score
+                ctx.fillStyle = 'white';
+                ctx.textAlign = 'center';
+                ctx.font = '900 14px Orbitron';
+                ctx.fillText(p.name, p.x - camera.x, p.y - camera.y - 10);
+                ctx.font = '400 12px Orbitron';
+                ctx.fillText(Math.floor(p.score), p.x - camera.x, p.y - camera.y + 15);
+
+                // Draw special visual if it's "me"
+                if (p.id === myId) {
+                    ctx.strokeStyle = '#8A2BE2'; // بنفسجي ساطع
+                    ctx.lineWidth = 4;
+                    ctx.stroke(); // Draw the stroke again for a highlight effect
+                }
+            });
+
+            // 6. Update Leaderboard
+            updateLeaderboard();
+
+            // 7. Request next frame
+            requestAnimationFrame(drawGame);
+        }
+
+        // --- Input Handling ---
+
+        function sendInput() {
+            if (ws && ws.readyState === WebSocket.OPEN && myPlayer) {
+                // Calculate target position in world coordinates
+                const targetX = camera.x + mousePos.x;
+                const targetY = camera.y + mousePos.y;
+
+                ws.send(JSON.stringify({
+                    type: 'move',
+                    x: targetX,
+                    y: targetY,
+                }));
             }
         }
-        
-        function updateLeaderboard(leaderboard) {
-            const list = document.getElementById('leaderboard-list');
-            list.innerHTML = '';
-            
-            leaderboard.forEach((item, index) => {
-                const div = document.createElement('div');
-                div.className = 'leader-item';
-                div.innerHTML = `<span>${index + 1}. ${item.name}</span><span>${item.score}</span>`;
-                list.appendChild(div);
+
+        function handleMouseMove(event) {
+            const rect = canvas.getBoundingClientRect();
+            mousePos.x = event.clientX - rect.left;
+            mousePos.y = event.clientY - rect.top;
+        }
+
+        function updateLeaderboard() {
+            // Sort players by score (radius) descending
+            const sortedPlayers = [...gameState.players].sort((a, b) => b.score - a.score).slice(0, 10);
+
+            leaderboardList.innerHTML = ''; // Clear existing list
+
+            sortedPlayers.forEach((p, index) => {
+                const isMe = p.id === myId;
+                const li = document.createElement('li');
+                
+                let scoreText = Math.floor(p.score);
+                let rankClass = '';
+                
+                if (index === 0) rankClass = 'text-yellow-400 font-black';
+                else if (index === 1) rankClass = 'text-gray-300 font-bold';
+                else if (index === 2) rankClass = 'text-orange-500 font-bold';
+                
+                li.className = `${rankClass} ${isMe ? 'bg-purple-900/40' : ''}`;
+                li.innerHTML = `
+                    <span class="w-6">${index + 1}.</span>
+                    <span class="flex-grow truncate ${isMe ? 'text-white' : ''}">${p.name.substring(0, 15)}</span>
+                    <span class="w-16 text-right">${scoreText}</span>
+                `;
+                leaderboardList.appendChild(li);
             });
         }
-        
-        // بدء حلقة الرسم
-        draw();
+
+        // --- Initialization and Events ---
+
+        function resizeCanvas() {
+            // يتم ضبط حجم اللوحة ليتناسب مع نافذة العرض
+            canvas.width = window.innerWidth * 0.95; // 95% of screen width
+            canvas.height = window.innerHeight * 0.85; // 85% of screen height
+        }
+
+        startGameButton.addEventListener('click', () => {
+            const name = playerNameInput.value.trim() || 'Anonymous Player';
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                // Send the chosen name to the server
+                ws.send(JSON.stringify({ type: 'name', name: name }));
+                // Hide the modal and show dashboard
+                nameModal.classList.add('hidden');
+                document.getElementById('leaderboard').classList.remove('hidden');
+                dashboard.classList.remove('hidden');
+                requestAnimationFrame(drawGame); // Start rendering
+            } else {
+                alertUser('خطأ في الاتصال', 'الخادم غير متصل. الرجاء التأكد من رابط الخادم أو محاولة إعادة الاتصال.');
+                // Try to reconnect if starting failed
+                setTimeout(connectToServer, 1000);
+            }
+        });
+
+
+        // Input loop to send continuous movement updates
+        setInterval(sendInput, INPUT_DELAY);
+
+        // Event Listeners
+        window.addEventListener('resize', resizeCanvas);
+        canvas.addEventListener('mousemove', handleMouseMove);
+
+        // Initial setup on load
+        window.onload = function() {
+            resizeCanvas();
+            connectToServer();
+        };
+
     </script>
 </body>
 </html>

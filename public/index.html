@@ -197,11 +197,19 @@
             ws.onclose = (event) => {
                 connectionStatus.textContent = 'تم قطع الاتصال';
                 connectionStatus.className = 'absolute top-4 left-4 text-sm px-3 py-1 rounded-full bg-red-600 text-white font-bold';
-                console.warn(`WebSocket disconnected (Code: ${event.code}). Attempting reconnect in 3s...`);
+                // رسائل مفيدة بناءً على رمز الإغلاق
+                let reason = `رمز: ${event.code}`;
+                if (event.code === 1000) reason = "اغلاق طبيعي";
+                else if (event.code === 1006) reason = "تم قطع الاتصال بشكل غير طبيعي (الخادم غير مستجيب أو خطأ في البروتوكول)";
+                else if (event.code === 1005) reason = "لم يتم تحديد سبب الاغلاق (الشبكة أو الخادم)";
+
+                console.warn(`WebSocket disconnected (${reason}). Attempting reconnect in 3s...`);
                 setTimeout(connectToServer, 3000); // Attempt to reconnect
             };
 
             ws.onerror = (error) => {
+                connectionStatus.textContent = 'خطأ بالاتصال';
+                connectionStatus.className = 'absolute top-4 left-4 text-sm px-3 py-1 rounded-full bg-red-600 text-white font-bold';
                 console.error('WebSocket error occurred! This often means the server URL is wrong, the server is down, or a protocol mismatch (http vs https/ws vs wss). Check the SERVER_URL:', SERVER_URL, error);
             };
         }
